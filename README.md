@@ -19,7 +19,7 @@ Ce projet est une simulation de mécanique des fluides basée sur un système de
 
 1. Clonez ce dépôt :
 ```bash
-git clone [URL_DU_REPO]
+git clone https://github.com/SofianeBel/FluidSim.git
 cd fluid-simulation
 ```
 
