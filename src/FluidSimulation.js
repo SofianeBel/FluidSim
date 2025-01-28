@@ -6,23 +6,23 @@ export class FluidSimulation {
             particleCount: particleCount,
             particleSize: 0.1,
             gravity: 9.81,
-            damping: 0.8,          // Augmenté pour plus de stabilité
+            damping: 0.7,
             gridSize: 1,
             collisionThreshold: 0.1,
-            // Paramètres SPH ajustés
-            smoothingLength: 0.4,   // Augmenté pour plus d'interaction
-            particleMass: 0.1,      // Augmenté pour plus d'impact
-            restDensity: 100.0,     // Réduit pour plus de compressibilité
-            gasConstant: 100.0,     // Réduit pour des forces de pression plus douces
-            viscosity: 0.5,         // Augmenté pour plus de cohésion
-            surfaceTension: 0.2,    // Augmenté pour plus de cohésion
-            timeStep: 0.016,        // Augmenté pour des mouvements plus visibles
-            maxVelocity: 5.0,       // Augmenté pour plus de dynamisme
-            boundaryDamping: 0.8,   // Augmenté pour des rebonds plus énergiques
+            // Paramètres SPH réajustés
+            smoothingLength: 0.25,     // Distance d'interaction moyenne
+            particleMass: 0.1,         // Masse plus importante
+            restDensity: 50.0,         // Densité moyenne
+            gasConstant: 20.0,         // Pression modérée
+            viscosity: 0.5,            // Viscosité moyenne
+            surfaceTension: 0.2,       // Légère tension de surface
+            timeStep: 0.012,           // Pas de temps plus petit
+            maxVelocity: 8.0,          // Vitesse max réduite
+            boundaryDamping: 0.5,      // Amortissement moyen
             // Paramètres d'interaction
-            interactionRadius: 1.0,  // Rayon d'interaction avec la souris
-            interactionForce: 10.0,   // Force d'interaction avec la souris
-            // Paramètres spécifiques aux scénarios
+            interactionRadius: 0.8,
+            interactionForce: 12.0,
+            // Autres paramètres
             sourceRate: 10,
             waveAmplitude: 0.5,
             waveFrequency: 1.0,
@@ -240,47 +240,39 @@ export class FluidSimulation {
         const h = this.params.smoothingLength;
         const mass = this.params.particleMass;
 
-        // Réinitialiser les accélérations avec la gravité
+        // Gravité plus forte
         for (let i = 0; i < this.particles.length; i++) {
-            this.accelerations[i].set(0, -this.params.gravity, 0);
+            this.accelerations[i].set(0, -this.params.gravity * 2.5, 0);
         }
 
         // Calcul des forces
         for (let i = 0; i < this.particles.length; i++) {
             const pos_i = this.particles[i];
             const density_i = Math.max(this.densities[i], 0.1);
-            const pressure_i = this.pressures[i];
 
             for (const j of this.neighbors[i]) {
                 const pos_j = this.particles[j];
                 const density_j = Math.max(this.densities[j], 0.1);
-                const pressure_j = this.pressures[j];
 
                 const r = pos_i.clone().sub(pos_j);
                 const dist = r.length();
                 if (dist < 1e-12) continue;
 
-                // Force de pression plus forte
-                const pressureForce = r.clone().normalize().multiplyScalar(
-                    -mass * (pressure_i + pressure_j) / (2 * density_j) * 
-                    Math.pow((h - dist) / h, 2)
-                );
-                this.accelerations[i].add(pressureForce.multiplyScalar(3.0));
+                // Force de répulsion uniquement à très courte distance
+                if (dist < h * 0.5) {
+                    const repulsionForce = r.normalize().multiplyScalar(
+                        10.0 * mass / (dist * dist)
+                    );
+                    this.accelerations[i].add(repulsionForce);
+                }
 
-                // Force de viscosité plus significative
+                // Force de viscosité très faible
                 const velDiff = this.velocities[j].clone().sub(this.velocities[i]);
                 const viscosityForce = velDiff.multiplyScalar(
-                    this.params.viscosity * mass / density_j * (h - dist)
+                    this.params.viscosity * mass / density_j * 
+                    this.kernels.viscosity.laplacianW(dist, h) * 0.01
                 );
                 this.accelerations[i].add(viscosityForce);
-
-                // Force de cohésion renforcée
-                if (dist < h * 0.9) {
-                    const cohesionForce = r.normalize().multiplyScalar(
-                        -mass * this.params.surfaceTension * Math.pow(1 - dist/h, 2)
-                    );
-                    this.accelerations[i].add(cohesionForce);
-                }
             }
         }
     }
@@ -348,12 +340,11 @@ export class FluidSimulation {
 
         toolButtons.forEach(button => {
             button.addEventListener('click', (e) => {
-                e.preventDefault();
                 toolButtons.forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
                 this.currentTool = button.dataset.tool;
 
-                // Mettre à jour le message d'aide de manière synchrone
+                // Mettre à jour le message d'aide
                 if (toolInfo) {
                     switch(this.currentTool) {
                         case 'orbit':
@@ -377,12 +368,13 @@ export class FluidSimulation {
                     }
                     toolInfo.style.display = 'block';
                 }
-            }, { passive: true });
+            });
         });
     }
 
     handleMouseMove(event, camera) {
-        event.preventDefault();
+        if (!event || !camera) return;
+        
         this.mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
         this.mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -393,7 +385,7 @@ export class FluidSimulation {
                 case 'interact':
                     const intersectPoint = new THREE.Vector3();
                     if (this.raycaster.ray.intersectPlane(this.plane, intersectPoint)) {
-                        requestAnimationFrame(() => this.applyForceToNearbyParticles(intersectPoint));
+                        this.applyForceToNearbyParticles(intersectPoint);
                     }
                     break;
                 case 'rotate-plane':
@@ -415,8 +407,11 @@ export class FluidSimulation {
     }
 
     handleMouseDown(event, camera) {
-        event.preventDefault();
+        if (!event || !camera) return;
+
         this.isInteracting = true;
+        this.mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+        this.mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
         this.raycaster.setFromCamera(this.mousePosition, camera);
 
         switch(this.currentTool) {
@@ -424,27 +419,24 @@ export class FluidSimulation {
             case 'source':
                 const intersectPoint = new THREE.Vector3();
                 if (this.raycaster.ray.intersectPlane(this.plane, intersectPoint)) {
-                    requestAnimationFrame(() => {
-                        if (this.currentTool === 'add-obstacle') {
-                            this.addObstacle(intersectPoint);
-                        } else {
-                            this.addSource(intersectPoint);
-                        }
-                    });
+                    if (this.currentTool === 'add-obstacle') {
+                        this.addObstacle(intersectPoint);
+                    } else {
+                        this.addSource(intersectPoint);
+                    }
                 }
                 break;
         }
     }
 
     handleMouseUp(event) {
-        event.preventDefault();
         this.isInteracting = false;
     }
 
-    addObstacle(position) {
+    addObstacle(position, radius = 0.5) {  // Ajout du paramètre radius avec une valeur par défaut
         const obstacle = {
             position: position.clone(),
-            radius: 0.5
+            radius: radius
         };
         this.obstacles.push(obstacle);
     }
@@ -459,12 +451,24 @@ export class FluidSimulation {
     }
 
     applyForceToNearbyParticles(center) {
+        const forceRadius = this.params.interactionRadius * 2.0;  // Rayon d'interaction doublé
+        const forceStrength = this.params.interactionForce * 3.0; // Force d'interaction triplée
+        
         for (let i = 0; i < this.particles.length; i++) {
             const distance = center.distanceTo(this.particles[i]);
-            if (distance < this.params.interactionRadius) {
+            if (distance < forceRadius) {
                 const force = center.clone().sub(this.particles[i]);
-                force.normalize().multiplyScalar(this.params.interactionForce * (1 - distance / this.params.interactionRadius));
+                force.normalize().multiplyScalar(
+                    forceStrength * (1 - distance / forceRadius)
+                );
                 this.velocities[i].add(force);
+                
+                // Force aléatoire plus importante pour disperser les particules
+                this.velocities[i].add(new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.5,
+                    (Math.random() - 0.5) * 0.5,
+                    (Math.random() - 0.5) * 0.5
+                ));
             }
         }
     }
@@ -515,7 +519,7 @@ export class FluidSimulation {
     }
 
     setupControls() {
-        // Mise à jour des valeurs affichées de manière synchrone
+        // Mise à jour des valeurs affichées
         const updateValue = (id, value) => {
             const element = document.getElementById(id + 'Value');
             if (element) {
@@ -531,57 +535,92 @@ export class FluidSimulation {
                 updateValue(param, this.params[param]);
 
                 element.addEventListener('input', (e) => {
-                    e.preventDefault();
                     const value = parseFloat(e.target.value);
                     if (!isNaN(value)) {
                         this.params[param] = value;
                         updateValue(param, value);
 
-                        // Mises à jour spécifiques synchrones
-                        switch(param) {
-                            case 'particleCount':
-                                requestAnimationFrame(() => this.resetSimulation());
-                                break;
-                            case 'particleSize':
-                                if (this.mesh && this.mesh.material) {
-                                    this.mesh.material.size = value;
-                                }
-                                break;
-                            case 'gravity':
-                                this.accelerations.forEach(acc => acc.y = -value);
-                                break;
-                            case 'smoothingLength':
-                                this.kernels = this.initKernels();
-                                break;
+                        // Mises à jour spécifiques
+                        if (param === 'particleCount') {
+                            // Créer un nouveau tableau de positions pour la nouvelle taille
+                            const newPositions = new Float32Array(value * 3);
+                            const oldPositions = this.mesh.geometry.attributes.position.array;
+                            
+                            // Copier les anciennes positions
+                            const minLength = Math.min(oldPositions.length, newPositions.length);
+                            for (let i = 0; i < minLength; i++) {
+                                newPositions[i] = oldPositions[i];
+                            }
+                            
+                            // Mettre à jour la géométrie avec le nouveau tableau
+                            this.mesh.geometry.setAttribute('position', 
+                                new THREE.BufferAttribute(newPositions, 3)
+                            );
+                            
+                            // Réinitialiser la simulation avec le nouveau nombre de particules
+                            this.resetSimulation();
+                        } else if (param === 'particleSize') {
+                            if (this.mesh && this.mesh.material) {
+                                this.mesh.material.size = value;
+                            }
+                        } else if (param === 'gravity') {
+                            this.accelerations.forEach(acc => acc.y = -value);
+                        } else if (param === 'smoothingLength') {
+                            this.kernels = this.initKernels();
                         }
                     }
-                }, { passive: true });
+                });
             }
         });
 
         // Gestion des boutons
         const resetButton = document.getElementById('resetSimulation');
         if (resetButton) {
-            resetButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                requestAnimationFrame(() => this.resetSimulation());
-            }, { passive: true });
+            resetButton.addEventListener('click', () => {
+                this.resetSimulation();
+            });
         }
 
         const colorButton = document.getElementById('randomizeColors');
         if (colorButton) {
-            colorButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                requestAnimationFrame(() => this.randomizeColors());
-            }, { passive: true });
+            colorButton.addEventListener('click', () => {
+                this.randomizeColors();
+            });
         }
     }
 
     resetSimulation() {
-        this.particles = [];
-        this.velocities = [];
+        // Sauvegarder l'ancien nombre de particules
+        const oldCount = this.particles.length;
+        const newCount = this.params.particleCount;
+
+        // Réinitialiser les tableaux avec la nouvelle taille
+        this.particles = new Array(newCount);
+        this.velocities = new Array(newCount);
+        this.accelerations = new Array(newCount);
+        this.densities = new Array(newCount);
+        this.pressures = new Array(newCount);
+        this.neighbors = new Array(newCount);
+
+        // Initialiser les nouvelles particules
         this.initSimulation();
-        this.updateGeometry();
+
+        // Mettre à jour la géométrie si nécessaire
+        if (oldCount !== newCount) {
+            const positions = new Float32Array(newCount * 3);
+            for (let i = 0; i < newCount && i < this.particles.length; i++) {
+                if (this.particles[i]) {
+                    positions[i * 3] = this.particles[i].x;
+                    positions[i * 3 + 1] = this.particles[i].y;
+                    positions[i * 3 + 2] = this.particles[i].z;
+                }
+            }
+            this.mesh.geometry.setAttribute('position', 
+                new THREE.BufferAttribute(positions, 3)
+            );
+        } else {
+            this.updateGeometry();
+        }
     }
 
     randomizeColors() {
@@ -623,13 +662,19 @@ export class FluidSimulation {
     }
 
     updateGeometry() {
+        if (!this.mesh || !this.mesh.geometry || !this.particles.length) return;
+
         const positions = new Float32Array(this.params.particleCount * 3);
-        for (let i = 0; i < this.params.particleCount; i++) {
-            positions[i * 3] = this.particles[i].x;
-            positions[i * 3 + 1] = this.particles[i].y;
-            positions[i * 3 + 2] = this.particles[i].z;
+        for (let i = 0; i < this.particles.length && i < this.params.particleCount; i++) {
+            if (this.particles[i]) {
+                positions[i * 3] = this.particles[i].x;
+                positions[i * 3 + 1] = this.particles[i].y;
+                positions[i * 3 + 2] = this.particles[i].z;
+            }
         }
-        this.mesh.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        this.mesh.geometry.setAttribute('position', 
+            new THREE.BufferAttribute(positions, 3)
+        );
     }
 
     handleGridCollision(position, velocity) {
@@ -637,23 +682,23 @@ export class FluidSimulation {
         if (Math.abs(position.y) < this.params.collisionThreshold && velocity.y < 0) {
             position.y = 0;
             
-            // Réflexion plus douce sur le plan
+            // Réflexion plus énergique
             velocity.y = Math.abs(velocity.y) * this.params.damping;
             
-            // Friction avec le plan
-            const friction = 0.98;
+            // Presque pas de friction
+            const friction = 0.995;
             velocity.x *= friction;
             velocity.z *= friction;
 
-            // Ajout d'une légère perturbation pour plus de réalisme
-            if (Math.random() < 0.1) {  // 10% de chance d'ajouter une perturbation
-                const perturbation = 0.05;
+            // Perturbations plus fortes et plus fréquentes
+            if (Math.random() < 0.3) {  // 30% de chance
+                const perturbation = 0.3;  // Perturbation plus forte
                 velocity.x += (Math.random() - 0.5) * perturbation;
                 velocity.z += (Math.random() - 0.5) * perturbation;
             }
         }
 
-        // Limites du plan pour éviter que les particules ne s'échappent trop loin
+        // Limites du plan avec rebonds très énergiques
         const planLimit = 10;
         if (Math.abs(position.x) > planLimit) {
             position.x = Math.sign(position.x) * planLimit;
@@ -706,7 +751,6 @@ export class FluidSimulation {
         const scenarioButtons = document.querySelectorAll('.scenario-button');
         scenarioButtons.forEach(button => {
             button.addEventListener('click', (e) => {
-                e.preventDefault();
                 scenarioButtons.forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
                 const scenario = button.dataset.scenario;
