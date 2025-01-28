@@ -8,6 +8,7 @@ class App {
         this.setupScene();
         this.setupSimulation();
         this.setupControls();
+        this.setupEventListeners();
         this.animate();
     }
 
@@ -52,10 +53,42 @@ class App {
     setupSimulation() {
         this.simulation = new FluidSimulation();
         this.scene.add(this.simulation.mesh);
+        this.scene.add(this.simulation.planeHelper);
     }
 
     setupControls() {
-        // À implémenter : ajout des contrôles UI pour la simulation
+        this.controls.enabled = true;
+    }
+
+    setupEventListeners() {
+        this.renderer.domElement.addEventListener('mousemove', (event) => {
+            if (this.simulation.currentTool === 'orbit') {
+                return; // Laisser OrbitControls gérer le mouvement
+            }
+            this.simulation.handleMouseMove(event, this.camera);
+        });
+
+        this.renderer.domElement.addEventListener('mousedown', (event) => {
+            if (this.simulation.currentTool === 'orbit') {
+                return; // Laisser OrbitControls gérer le clic
+            }
+            this.simulation.handleMouseDown(event, this.camera);
+        });
+
+        this.renderer.domElement.addEventListener('mouseup', () => {
+            if (this.simulation.currentTool === 'orbit') {
+                return;
+            }
+            this.simulation.handleMouseUp();
+        });
+
+        // Gestion des changements d'outils
+        document.querySelectorAll('.tool-button').forEach(button => {
+            button.addEventListener('click', () => {
+                const tool = button.dataset.tool;
+                this.controls.enabled = tool === 'orbit';
+            });
+        });
     }
 
     animate() {

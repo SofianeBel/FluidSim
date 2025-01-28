@@ -12,28 +12,188 @@
       }
       body {
         overflow: hidden;
+        font-family: Arial, sans-serif;
       }
       canvas {
         width: 100vw;
         height: 100vh;
         display: block;
       }
-      #ui-container {
+      #toolbar {
         position: fixed;
         top: 20px;
-        right: 20px;
-        background: rgba(0, 0, 0, 0.7);
-        padding: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.85);
+        padding: 10px 20px;
         border-radius: 8px;
+        display: flex;
+        gap: 10px;
+        z-index: 1000;
+      }
+      .tool-button {
+        background: rgba(0, 255, 255, 0.2);
         color: white;
-        font-family: Arial, sans-serif;
+        border: 1px solid #00ffff;
+        padding: 8px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+      }
+      .tool-button:hover {
+        background: rgba(0, 255, 255, 0.4);
+      }
+      .tool-button.active {
+        background: #00ffff;
+        color: black;
+      }
+      .tool-button i {
+        margin-right: 5px;
+      }
+      #tool-info {
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.85);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 4px;
+        display: none;
+      }
+      #ui-container {
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 300px;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.85);
+        padding: 20px;
+        color: white;
+        overflow-y: auto;
+      }
+      .control-group {
+        margin-bottom: 20px;
+        padding: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 5px;
+      }
+      .control-group h3 {
+        margin-bottom: 15px;
+        color: #00ffff;
+      }
+      .control-item {
+        margin-bottom: 15px;
+      }
+      .control-item label {
+        display: block;
+        margin-bottom: 5px;
+      }
+      .control-item input[type="range"] {
+        width: 100%;
+        margin-bottom: 5px;
+      }
+      .control-item input[type="number"] {
+        width: 80px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 5px;
+        border-radius: 3px;
+      }
+      .value-display {
+        font-size: 0.9em;
+        color: #00ffff;
+      }
+      button {
+        background: #00ffff;
+        color: black;
+        border: none;
+        padding: 8px 15px;
+        border-radius: 3px;
+        cursor: pointer;
+        width: 100%;
+        margin-bottom: 10px;
+      }
+      button:hover {
+        background: #00cccc;
       }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   </head>
   <body>
+    <div id="toolbar">
+      <button class="tool-button active" data-tool="orbit">
+        <i class="fas fa-street-view"></i> Orbite
+      </button>
+      <button class="tool-button" data-tool="interact">
+        <i class="fas fa-hand-pointer"></i> Interagir
+      </button>
+      <button class="tool-button" data-tool="rotate-plane">
+        <i class="fas fa-sync-alt"></i> Rotation Plan
+      </button>
+      <button class="tool-button" data-tool="add-force">
+        <i class="fas fa-wind"></i> Force
+      </button>
+      <button class="tool-button" data-tool="add-obstacle">
+        <i class="fas fa-cube"></i> Obstacle
+      </button>
+      <button class="tool-button" data-tool="source">
+        <i class="fas fa-faucet"></i> Source
+      </button>
+    </div>
+
+    <div id="tool-info">
+      Utilisez le clic gauche pour interagir
+    </div>
+
     <div id="ui-container">
-      <h2>Contrôles</h2>
-      <!-- Les contrôles seront ajoutés ici dynamiquement -->
+      <h2 style="margin-bottom: 20px;">Paramètres de Simulation</h2>
+      
+      <div class="control-group">
+        <h3>Particules</h3>
+        <div class="control-item">
+          <label for="particleCount">Nombre de particules</label>
+          <input type="range" id="particleCount" min="100" max="5000" value="1000" step="100">
+          <span class="value-display" id="particleCountValue">1000</span>
+        </div>
+        <div class="control-item">
+          <label for="particleSize">Taille des particules</label>
+          <input type="range" id="particleSize" min="0.01" max="0.5" value="0.1" step="0.01">
+          <span class="value-display" id="particleSizeValue">0.1</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Physique</h3>
+        <div class="control-item">
+          <label for="gravity">Gravité</label>
+          <input type="range" id="gravity" min="0" max="20" value="9.81" step="0.1">
+          <span class="value-display" id="gravityValue">9.81</span>
+        </div>
+        <div class="control-item">
+          <label for="damping">Amortissement</label>
+          <input type="range" id="damping" min="0" max="1" value="0.5" step="0.01">
+          <span class="value-display" id="dampingValue">0.5</span>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <h3>Grille</h3>
+        <div class="control-item">
+          <label for="gridSize">Taille de la grille</label>
+          <input type="range" id="gridSize" min="0.5" max="2" value="1" step="0.1">
+          <span class="value-display" id="gridSizeValue">1.0</span>
+        </div>
+        <div class="control-item">
+          <label for="collisionThreshold">Seuil de collision</label>
+          <input type="range" id="collisionThreshold" min="0.01" max="0.5" value="0.1" step="0.01">
+          <span class="value-display" id="collisionThresholdValue">0.1</span>
+        </div>
+      </div>
+
+      <button id="resetSimulation">Réinitialiser la simulation</button>
+      <button id="randomizeColors">Couleurs aléatoires</button>
     </div>
     <script type="module" src="/src/main.js"></script>
   </body>
