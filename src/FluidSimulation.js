@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 
+/**
+ * Class representing a fluid simulation using SPH (Smoothed Particle Hydrodynamics).
+ * It manages simulation parameters, the initialization of particles, kernels, and the simulation lifecycle.
+ */
 export class FluidSimulation {
+    /**
+     * Creates an instance of FluidSimulation.
+     * @param {number} [particleCount=1000] - The number of particles to simulate.
+     */
     constructor(particleCount = 1000) {
         this.params = {
             particleCount: particleCount,
@@ -70,6 +78,10 @@ export class FluidSimulation {
         this.setupToolbar();
     }
 
+    /**
+     * Initializes the SPH kernel functions for density, pressure, and viscosity calculations.
+     * @returns {Object} An object containing kernel functions: poly6, spiky, and viscosity.
+     */
     initKernels() {
         const h = this.params.smoothingLength;
         const h2 = h * h;

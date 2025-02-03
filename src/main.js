@@ -2,7 +2,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { FluidSimulation } from './FluidSimulation';
 
+/**
+ * The main application class for running the 3D fluid simulation.
+ * It initializes the scene, simulation, camera, controls, and event listeners.
+ */
 class App {
+    /**
+     * Creates an instance of App and initializes the simulation.
+     */
     constructor() {
         this.init();
         this.setupScene();
@@ -12,6 +19,9 @@ class App {
         this.animate();
     }
 
+    /**
+     * Initializes the Three.js scene, camera, and renderer.
+     */
     init() {
         this.scene = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -28,6 +38,9 @@ class App {
         });
     }
 
+    /**
+     * Sets up the scene including camera configuration, lighting, and helper elements.
+     */
     setupScene() {
         // Configuration de la caméra
         this.camera.position.set(5, 5, 5);
@@ -50,16 +63,25 @@ class App {
         this.scene.add(gridHelper);
     }
 
+    /**
+     * Initializes the fluid simulation and adds related objects (mesh and helpers) to the scene.
+     */
     setupSimulation() {
         this.simulation = new FluidSimulation();
         this.scene.add(this.simulation.mesh);
         this.scene.add(this.simulation.planeHelper);
     }
 
+    /**
+     * Enables the orbital controls.
+     */
     setupControls() {
         this.controls.enabled = true;
     }
 
+    /**
+     * Sets up event listeners for handling user interactions with the simulation.
+     */
     setupEventListeners() {
         this.renderer.domElement.addEventListener('mousemove', (event) => {
             if (this.simulation.currentTool === 'orbit') {
@@ -91,6 +113,9 @@ class App {
         });
     }
 
+    /**
+     * Animates the scene by updating controls, simulation, and rendering each frame.
+     */
     animate() {
         requestAnimationFrame(() => this.animate());
         
